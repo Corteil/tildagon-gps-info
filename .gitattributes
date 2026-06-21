@@ -1,0 +1,7 @@
+# Keep the on-badge app-store tarball to just the app itself.
+# The store builds the release tarball from the repo and ships it to badges;
+# these files are not needed on the badge.
+EEPROM/ export-ignore
+README.md export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore

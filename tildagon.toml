@@ -1,0 +1,27 @@
+[app]
+# The name of your app as displayed in the menu
+name = "GPS Info"
+
+# The submenu where your app should appear.
+# One of: "Badge", "Music", "Media", "Apps", "Games"
+category = "Apps"
+
+[entry]
+# The name of your entry point `Application` class
+class = "GPSSkyMap"
+
+[metadata]
+# Your nickname.  Must be at most 32 characters!
+author = "Corteil"
+
+# License of your app as an SPDX identifier: <https://spdx.org/licenses/>
+license = "MIT"
+
+# URL to the repository of your app.
+url = "https://github.com/Corteil/tildagon-gps-info"
+
+# Description of your app.  Maximum 140 characters!
+description = "GPS status, satellite count and a sky map of the satellites in view, for the GPS Hexpansion"
+
+# Version number of your app.  Must be an integer!
+version = "1"
