@@ -69,6 +69,8 @@ hard-coded in `prepare_eeprom.py` for the flashing step.
 
 ## 2. Install the app
 
+install the app from the app library or follow the instructions below
+
 The launcher loads each app as `apps.<folder>.app` and reads its menu name from
 a `metadata.json`, so the app must be installed as a **folder** (a bare `.mpy`
 file will not load):
