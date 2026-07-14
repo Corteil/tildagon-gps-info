@@ -35,6 +35,31 @@ VIEW_DATA = 1
 
 FIX_LABELS = {1: "No Fix", 2: "2D Fix", 3: "3D Fix"}
 
+# --- Easter egg: the satellites become rubber ducks near the EMF ponds ---
+DUCK = "⇩"                 # the badge font's duck glyph (app_components.tokens "duck")
+EMF_POND = (52.03927, -2.38026)  # EMF ponds @ Eastnor Castle Deer Park (can recalibrate on site)
+DUCK_RANGE_M = 100              # ducks appear within this distance of the pond
+DUCK_YELLOW = (1.0, 0.82, 0.0)
+DUCK_UNLOCK_PRESSES = 10        # Down-presses on the sky view to reveal the setting
+
+
+def _get(key, default=None):
+    try:
+        import settings
+        v = settings.get(key)
+        return default if v is None else v
+    except Exception:
+        return default
+
+
+def _set(key, value):
+    try:
+        import settings
+        settings.set(key, value)
+        settings.save()
+    except Exception:
+        pass
+
 
 def get_app_by_vid_pid_shim(vid, pid):
     try:
@@ -84,6 +109,11 @@ class GPSSkyMap(app.App):
         # LED status-ring state (colour = fix status, count = sats in view)
         self._led_state = None
         self._led_phase = 0
+
+        # Easter egg state
+        self._down_count = 0
+        self._toast = ""
+        self._toast_ms = 0
 
         self.gps = None
         self._find_gps_module()
@@ -139,6 +169,24 @@ class GPSSkyMap(app.App):
         if self.button_states.get(BUTTON_TYPES["LEFT"]):
             self.view = (self.view - 1) % 2
             self.button_states.clear()
+
+        # Hidden duck controls (sky view only)
+        if self.view == VIEW_SKY:
+            if self.button_states.get(BUTTON_TYPES["DOWN"]):
+                self._duck_down()
+                self.button_states.clear()
+            if self.button_states.get(BUTTON_TYPES["UP"]):
+                if self._duck_unlocked():
+                    self._cycle_ducks(-1)
+                self.button_states.clear()
+            if self.button_states.get(BUTTON_TYPES["CONFIRM"]):
+                if self._duck_unlocked() and self.position:
+                    _set("gpsinfo_pond_lat", self.position[0])
+                    _set("gpsinfo_pond_lon", self.position[1])
+                    self._toast_show("Pond set " + DUCK)
+                self.button_states.clear()
+        if self._toast_ms > 0:
+            self._toast_ms -= delta
 
         # Snapshot GPS data. Position/speed/bearing come from the firmware; the
         # satellite/altitude/fix data is parsed here from the raw NMEA sentences
@@ -271,6 +319,50 @@ class GPSSkyMap(app.App):
             pass
         self._led_state = None
 
+    # --- easter egg -------------------------------------------------------
+
+    def _duck_unlocked(self):
+        return bool(_get("gpsinfo_duck_unlocked", False))
+
+    def _toast_show(self, msg):
+        self._toast = msg
+        self._toast_ms = 1600
+
+    def _duck_down(self):
+        if self._duck_unlocked():
+            self._cycle_ducks(1)
+            return
+        self._down_count += 1
+        if self._down_count >= DUCK_UNLOCK_PRESSES:
+            _set("gpsinfo_duck_unlocked", True)
+            self._down_count = 0
+            self._toast_show("Ducks unlocked! " + DUCK)
+
+    def _cycle_ducks(self, d):
+        modes = ("auto", "on", "off")
+        cur = _get("gpsinfo_ducks", "auto")
+        i = modes.index(cur) if cur in modes else 0
+        mode = modes[(i + d) % len(modes)]
+        _set("gpsinfo_ducks", mode)
+        self._toast_show("Ducks: " + mode + " " + DUCK)
+
+    def _near_pond(self):
+        if not self.position:
+            return False
+        plat = _get("gpsinfo_pond_lat", EMF_POND[0])
+        plon = _get("gpsinfo_pond_lon", EMF_POND[1])
+        dlat = (self.position[0] - plat) * 111320.0
+        dlon = (self.position[1] - plon) * 111320.0 * math.cos(math.radians(self.position[0]))
+        return (dlat * dlat + dlon * dlon) < (DUCK_RANGE_M * DUCK_RANGE_M)
+
+    def _ducks_active(self):
+        mode = _get("gpsinfo_ducks", "auto")
+        if mode == "off":
+            return False
+        if mode == "on":
+            return True
+        return self._near_pond()          # auto: ducks near the EMF ponds
+
     # --- draw -------------------------------------------------------------
 
     def draw(self, ctx):
@@ -291,6 +383,14 @@ class GPSSkyMap(app.App):
             self._draw_skymap(ctx)
         else:
             self._draw_data(ctx)
+
+        if self._toast_ms > 0:
+            ctx.save()
+            ctx.text_align = ctx.CENTER
+            ctx.text_baseline = ctx.MIDDLE
+            ctx.font_size = 20
+            ctx.rgb(1.0, 0.85, 0.1).move_to(0, 62).text(self._toast)
+            ctx.restore()
 
     def _draw_status(self, ctx, title, subtitle, colour):
         ctx.save()
@@ -333,10 +433,18 @@ class GPSSkyMap(app.App):
         ):
             ctx.move_to(x, y).text(label)
 
-        # Satellites
+        # Satellites -- or rubber ducks near the EMF ponds
+        ducks = self._ducks_active()
+        if ducks:
+            ctx.text_align = ctx.CENTER
+            ctx.text_baseline = ctx.MIDDLE
         for s in self.sats:
             x, y = sky_xy(s["azimuth"], s["elevation"])
             snr = s["snr"]
+            if ducks:
+                ctx.font_size = 16 + min(12.0, snr / 3.0)
+                ctx.rgb(*DUCK_YELLOW).move_to(x, y).text(DUCK)
+                continue
             rad = 4 + min(4.0, snr / 12.0)
             ctx.begin_path()
             ctx.rgb(*snr_colour(snr))
@@ -355,7 +463,10 @@ class GPSSkyMap(app.App):
         ctx.font_size = 18
         ctx.rgb(1, 1, 1)
         ctx.move_to(0, -86).text(FIX_LABELS.get(self.fix_type, "--"))
-        if self.sky_data:
+        if ducks and self.sky_data:
+            ctx.rgb(*DUCK_YELLOW)
+            ctx.move_to(0, 86).text(f"{len(self.sats)} ducks {DUCK}")
+        elif self.sky_data:
             ctx.move_to(0, 86).text(f"{self.num_sats} used / {len(self.sats)} seen")
         else:
             ctx.font_size = 15
