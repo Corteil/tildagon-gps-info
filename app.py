@@ -37,7 +37,10 @@ FIX_LABELS = {1: "No Fix", 2: "2D Fix", 3: "3D Fix"}
 
 # --- Easter egg: the satellites become rubber ducks near the EMF ponds ---
 DUCK = "⇩"                 # the badge font's duck glyph (app_components.tokens "duck")
-EMF_POND = (52.03927, -2.38026)  # EMF ponds @ Eastnor Castle Deer Park (can recalibrate on site)
+EMF_PONDS = (                    # EMF ponds @ Eastnor Castle Deer Park
+    (52.03927, -2.38026),
+    (52.04271, -2.37769),
+)
 DUCK_RANGE_M = 100              # ducks appear within this distance of the pond
 DUCK_YELLOW = (1.0, 0.82, 0.0)
 DUCK_UNLOCK_PRESSES = 10        # Down-presses on the sky view to reveal the setting
@@ -349,11 +352,19 @@ class GPSSkyMap(app.App):
     def _near_pond(self):
         if not self.position:
             return False
-        plat = _get("gpsinfo_pond_lat", EMF_POND[0])
-        plon = _get("gpsinfo_pond_lon", EMF_POND[1])
-        dlat = (self.position[0] - plat) * 111320.0
-        dlon = (self.position[1] - plon) * 111320.0 * math.cos(math.radians(self.position[0]))
-        return (dlat * dlat + dlon * dlon) < (DUCK_RANGE_M * DUCK_RANGE_M)
+        lat, lon = self.position
+        coslat = math.cos(math.radians(lat))
+        ponds = list(EMF_PONDS)
+        plat = _get("gpsinfo_pond_lat")
+        plon = _get("gpsinfo_pond_lon")
+        if plat is not None and plon is not None:
+            ponds.append((plat, plon))          # user-calibrated pond
+        for pl, po in ponds:
+            dlat = (lat - pl) * 111320.0
+            dlon = (lon - po) * 111320.0 * coslat
+            if (dlat * dlat + dlon * dlon) < (DUCK_RANGE_M * DUCK_RANGE_M):
+                return True
+        return False
 
     def _ducks_active(self):
         mode = _get("gpsinfo_ducks", "auto")

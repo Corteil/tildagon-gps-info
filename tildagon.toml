@@ -24,4 +24,4 @@ url = "https://github.com/Corteil/tildagon-gps-info"
 description = "GPS status, satellite count and a sky map of the satellites in view, for the GPS Hexpansion"
 
 # Version number of your app.  Must be an integer!
-version = "2"
+version = "3"
