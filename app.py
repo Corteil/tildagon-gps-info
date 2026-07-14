@@ -41,7 +41,7 @@ EMF_PONDS = (                    # EMF ponds @ Eastnor Castle Deer Park
     (52.03927, -2.38026),
     (52.04271, -2.37769),
 )
-DUCK_RANGE_M = 100              # ducks appear within this distance of the pond
+DUCK_RANGE_M = 150              # ducks appear within this distance of a pond
 DUCK_YELLOW = (1.0, 0.82, 0.0)
 DUCK_UNLOCK_PRESSES = 10        # Down-presses on the sky view to reveal the setting
 
